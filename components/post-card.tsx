@@ -6,6 +6,7 @@ import { Heart, MessageSquare, Edit, Trash2, Save, X } from "lucide-react";
 import { deletePost, updatePost } from "@/lib/actions";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "react-toastify";
+import { validateField, clientUpdatePostSchema } from "@/lib/client-validation";
 
 interface PostCardProps {
   post: PostWithDetails;
@@ -26,6 +27,7 @@ export function PostCard({
   const [editContent, setEditContent] = useState(post.content);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [contentError, setContentError] = useState<string | null>(null);
 
   const isOwner = currentUserId === post.author_id;
   const createdAt = new Date(post.created_at);
@@ -37,10 +39,8 @@ export function PostCard({
     setIsDeleting(true);
     try {
       const result = await deletePost(post.id);
-      if (result && result.success) {
-        if (onPostDeleted) {
-          onPostDeleted(post.id);
-        }
+      if (result?.success) {
+        onPostDeleted?.(post.id);
       } else {
         toast.error(result?.error || "Failed to delete post");
       }
@@ -53,7 +53,15 @@ export function PostCard({
   };
 
   const handleUpdate = async (formData: FormData) => {
-    if (!editContent.trim() || editContent === post.content) {
+    const content = editContent.trim();
+
+    const error = validateField(clientUpdatePostSchema, "content", content);
+    if (error) {
+      setContentError(error);
+      return;
+    }
+
+    if (content === post.content) {
       setIsEditing(false);
       return;
     }
@@ -63,6 +71,8 @@ export function PostCard({
       const result = await updatePost(post.id, formData);
       if (result?.success && result.data) {
         setIsEditing(false);
+        setContentError(null);
+
         if (onPostUpdated) {
           const updatedPost: PostWithDetails = {
             ...post,
@@ -84,8 +94,20 @@ export function PostCard({
     }
   };
 
+  const handleContentChange = (value: string) => {
+    setEditContent(value);
+
+    const error = validateField(
+      clientUpdatePostSchema,
+      "content",
+      value.trim()
+    );
+    setContentError(error);
+  };
+
   const handleCancelEdit = () => {
     setEditContent(post.content);
+    setContentError(null);
     setIsEditing(false);
   };
 
@@ -97,6 +119,12 @@ export function PostCard({
       toast.error("Failed to update like");
     }
   };
+
+  const isUpdateDisabled =
+    !editContent.trim() ||
+    contentError !== null ||
+    editContent.length > 280 ||
+    isUpdating;
 
   return (
     <div className="card p-4 space-y-3">
@@ -137,18 +165,30 @@ export function PostCard({
       <div className="ml-10">
         {isEditing ? (
           <form action={handleUpdate} className="space-y-2">
-            <textarea
-              name="content"
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="textarea w-full min-h-[80px]"
-              maxLength={280}
-              disabled={isUpdating}
-            />
+            <div>
+              <textarea
+                name="content"
+                value={editContent}
+                onChange={(e) => handleContentChange(e.target.value)}
+                className={`textarea w-full min-h-[80px] ${
+                  contentError ? "border-red-500 focus:border-red-500" : ""
+                }`}
+                maxLength={300}
+                disabled={isUpdating}
+              />
+              {contentError && (
+                <p className="text-sm text-red-600 mt-1">{contentError}</p>
+              )}
+            </div>
+
             <div className="flex items-center justify-between">
               <span
                 className={`text-sm ${
-                  editContent.length > 280 ? "text-red-600" : "text-gray-500"
+                  editContent.length > 280
+                    ? "text-red-600"
+                    : editContent.length > 240
+                    ? "text-yellow-600"
+                    : "text-gray-500"
                 }`}
               >
                 {280 - editContent.length} characters remaining
@@ -165,11 +205,7 @@ export function PostCard({
                 </button>
                 <button
                   type="submit"
-                  disabled={
-                    !editContent.trim() ||
-                    editContent.length > 280 ||
-                    isUpdating
-                  }
+                  disabled={isUpdateDisabled}
                   className="btn btn-primary flex items-center space-x-1"
                 >
                   <Save className="h-4 w-4" />

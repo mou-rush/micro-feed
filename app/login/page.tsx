@@ -5,6 +5,18 @@ import { createClient } from "@/lib/supabase-client";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, User } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  validateAuth,
+  validateField,
+  createClientAuthSchema,
+} from "@/lib/client-validation";
+
+interface FormErrors {
+  email?: string;
+  password?: string;
+  username?: string;
+  general?: string;
+}
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -12,22 +24,75 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const router = useRouter();
   const supabase = createClient();
 
+  const validateFormField = (
+    field: "email" | "password" | "username",
+    value: string
+  ) => {
+    const schema = createClientAuthSchema(isSignUp);
+    const error = validateField(schema, field, value);
+
+    setErrors((prev) => ({
+      ...prev,
+      [field]: error || undefined,
+    }));
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmail(value);
+    validateFormField("email", value);
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    validateFormField("password", value);
+  };
+
+  const handleUsernameChange = (value: string) => {
+    setUsername(value);
+    if (isSignUp) {
+      validateFormField("username", value);
+    }
+  };
+
+  const handleModeChange = () => {
+    setIsSignUp(!isSignUp);
+    setErrors({});
+    if (!isSignUp) {
+      if (username.trim()) {
+        validateFormField("username", username);
+      }
+    } else {
+      setErrors((prev) => {
+        const { username, ...rest } = prev;
+        return rest;
+      });
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setErrors({});
+
+    const formData = isSignUp
+      ? { email, password, username: username.trim() }
+      : { email, password };
+
+    const validation = validateAuth(formData, isSignUp);
+
+    if (!validation.success) {
+      setErrors(validation.errors);
+      setLoading(false);
+      return;
+    }
 
     try {
       if (isSignUp) {
-        if (!username.trim()) {
-          throw new Error("Username is required");
-        }
-
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -46,8 +111,6 @@ export default function LoginPage() {
         }
 
         if (data.user) {
-          /*Create profile - this will be handled by the getOrCreateProfile function
-          when they first visit the app after email confirmation */
           router.push("/");
         }
       } else {
@@ -59,13 +122,26 @@ export default function LoginPage() {
         if (error) throw error;
         router.push("/");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Auth error:", error);
-      setError(error.message);
+      setErrors({
+        general: error instanceof Error ? error.message : "An error occurred",
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  const hasFieldErrors = Object.keys(errors).some(
+    (key) => key !== "general" && errors[key as keyof FormErrors]
+  );
+  const isFormValid =
+    !hasFieldErrors &&
+    email.trim() &&
+    password.trim() &&
+    (!isSignUp || username.trim());
+
+  const signUpSignInButtonText = isSignUp ? "Sign Up" : "Sign In";
 
   return (
     <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center px-4">
@@ -97,16 +173,18 @@ export default function LoginPage() {
                     id="username"
                     type="text"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="input pl-10"
+                    onChange={(e) => handleUsernameChange(e.target.value)}
+                    className={`input pl-10 ${
+                      errors.username
+                        ? "border-red-500 focus:border-red-500"
+                        : ""
+                    }`}
                     placeholder="username"
-                    required
-                    minLength={3}
-                    maxLength={20}
-                    pattern="[a-zA-Z0-9_]+"
-                    title="Username can only contain letters, numbers, and underscores"
                   />
                 </div>
+                {errors.username && (
+                  <p className="text-sm text-red-600 mt-1">{errors.username}</p>
+                )}
               </div>
             )}
 
@@ -120,12 +198,16 @@ export default function LoginPage() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input pl-10"
+                  onChange={(e) => handleEmailChange(e.target.value)}
+                  className={`input pl-10 ${
+                    errors.email ? "border-red-500 focus:border-red-500" : ""
+                  }`}
                   placeholder="you@example.com"
-                  required
                 />
               </div>
+              {errors.email && (
+                <p className="text-sm text-red-600 mt-1">{errors.email}</p>
+              )}
             </div>
 
             <div>
@@ -141,34 +223,37 @@ export default function LoginPage() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input pl-10"
+                  onChange={(e) => handlePasswordChange(e.target.value)}
+                  className={`input pl-10 ${
+                    errors.password ? "border-red-500 focus:border-red-500" : ""
+                  }`}
                   placeholder="••••••••"
-                  required
-                  minLength={6}
                 />
               </div>
+              {errors.password && (
+                <p className="text-sm text-red-600 mt-1">{errors.password}</p>
+              )}
             </div>
 
-            {error && (
+            {errors.general && (
               <div className="text-red-600 text-sm bg-red-50 dark:bg-red-900/10 p-3 rounded">
-                {error}
+                {errors.general}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={loading}
-              className="btn btn-primary w-full"
+              disabled={loading || !isFormValid}
+              className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
+              {loading ? "Loading..." : signUpSignInButtonText}
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <button
               type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
+              onClick={handleModeChange}
               className="text-primary hover:underline"
             >
               {isSignUp
