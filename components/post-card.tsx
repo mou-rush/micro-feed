@@ -215,7 +215,7 @@ export function PostCard({
             </div>
           </form>
         ) : (
-          <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
+          <p className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap break-words overflow-wrap-anywhere leading-relaxed">
             {post.content}
           </p>
         )}

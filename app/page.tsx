@@ -36,7 +36,7 @@ export default async function HomePage({ searchParams }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black">
+    <div className="min-h-screen">
       <Header />
 
       <main className="max-w-2xl mx-auto px-4 py-6">

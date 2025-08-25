@@ -1,6 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { LogOut, MessageSquare } from "lucide-react";
-import { ThemeToggle } from "./theme-toggle";
 import { redirect } from "next/navigation";
 
 export async function Header() {
@@ -26,7 +25,6 @@ export async function Header() {
         </div>
 
         <div className="flex items-center space-x-2">
-          <ThemeToggle />
           {user && (
             <form action={signOut}>
               <button

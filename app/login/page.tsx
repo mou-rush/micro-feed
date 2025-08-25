@@ -4,7 +4,6 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase-client";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, User } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   validateAuth,
   validateField,
@@ -145,10 +144,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center px-4">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="max-w-md w-full">
         <div className="card p-8">
           <div className="text-center mb-8">
@@ -168,18 +163,20 @@ export default function LoginPage() {
                   Username
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-4 w-4 text-gray-400" />
+                  </div>
                   <input
                     id="username"
                     type="text"
                     value={username}
                     onChange={(e) => handleUsernameChange(e.target.value)}
-                    className={`input pl-10 ${
+                    className={`block w-full pl-10 pr-3 py-3 border rounded-lg shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
                       errors.username
-                        ? "border-red-500 focus:border-red-500"
-                        : ""
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     }`}
-                    placeholder="username"
+                    placeholder="Enter your username"
                   />
                 </div>
                 {errors.username && (
@@ -193,16 +190,20 @@ export default function LoginPage() {
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-4 w-4 text-gray-400" />
+                </div>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => handleEmailChange(e.target.value)}
-                  className={`input pl-10 ${
-                    errors.email ? "border-red-500 focus:border-red-500" : ""
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    errors.email
+                      ? "border-red-500 focus:ring-red-500"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   }`}
-                  placeholder="you@example.com"
+                  placeholder="Enter your email address"
                 />
               </div>
               {errors.email && (
@@ -218,16 +219,24 @@ export default function LoginPage() {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-4 w-4 text-gray-400" />
+                </div>
                 <input
                   id="password"
                   type="password"
                   value={password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
-                  className={`input pl-10 ${
-                    errors.password ? "border-red-500 focus:border-red-500" : ""
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-lg shadow-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    errors.password
+                      ? "border-red-500 focus:ring-red-500"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   }`}
-                  placeholder="••••••••"
+                  placeholder={
+                    isSignUp
+                      ? "Create a secure password"
+                      : "Enter your password"
+                  }
                 />
               </div>
               {errors.password && (
