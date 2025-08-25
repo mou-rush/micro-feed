@@ -8,14 +8,16 @@ import { FeedContent } from "@/components/feed-content";
 import { LoadingSpinner } from "@/components/loading-spinner";
 
 interface PageProps {
-  searchParams: {
+  searchParams: Promise<{
     query?: string;
     cursor?: string;
     filter?: "all" | "mine";
-  };
+  }>;
 }
 
 export default async function HomePage({ searchParams }: PageProps) {
+  const resolvedSearchParams = await searchParams;
+
   const supabase = await createServerSupabaseClient();
 
   const {
@@ -42,7 +44,7 @@ export default async function HomePage({ searchParams }: PageProps) {
 
         <Suspense fallback={<LoadingSpinner />}>
           <FeedContent
-            searchParams={searchParams}
+            searchParams={resolvedSearchParams}
             currentUser={{ id: user.id, username: profile.username }}
           />
         </Suspense>

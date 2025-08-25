@@ -52,7 +52,7 @@ export async function getPosts(
   } = {}
 ) {
   try {
-    const { query = "", cursor, filter = "all", userId } = params;
+    const { query = "", cursor, filter = "all" } = params;
 
     const user = await requireAuth();
     const supabase = await createServerSupabaseClient();
@@ -62,11 +62,12 @@ export async function getPosts(
       .select("id, author_id, content, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(10);
-    if (filter === "mine" && userId) {
-      queryBuilder = queryBuilder.eq("author_id", userId);
+    if (filter === "mine") {
+      queryBuilder = queryBuilder.eq("author_id", user.id);
     }
 
     if (query && query.trim() !== "") {
+      console.log("Applying search query:", query.trim());
       queryBuilder = queryBuilder.ilike("content", `%${query.trim()}%`);
     }
 

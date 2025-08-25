@@ -32,7 +32,6 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
       const newPosts = await getPosts({
         query: searchParams.query,
         filter: searchParams.filter || "all",
-        userId: currentUser.id,
       });
       setPosts(newPosts);
       setHasMore(newPosts.length === 10);
@@ -42,7 +41,7 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
     } finally {
       setLoading(false);
     }
-  }, [searchParams.query, searchParams.filter, currentUser.id]);
+  }, [searchParams.query, searchParams.filter]);
 
   useEffect(() => {
     loadPosts();
@@ -58,7 +57,6 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
         query: searchParams.query,
         filter: searchParams.filter || "all",
         cursor: lastPost?.created_at,
-        userId: currentUser.id,
       });
 
       if (morePosts.length > 0) {
