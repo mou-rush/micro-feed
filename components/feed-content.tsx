@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { getPosts } from "@/lib/actions";
 import { PostWithDetails } from "@/types/post";
 import { Composer } from "./composer";
 import { PostCard } from "./post-card";
 import { LoadingSpinner } from "./loading-spinner";
-import { useOptimisticLikes, useOptimisticPosts } from "@/hooks/use-optimistic";
+import { useOptimisticLikes } from "@/hooks/use-optimistic";
+import { toast } from "react-toastify";
 
 interface FeedContentProps {
   searchParams: {
@@ -23,30 +24,29 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  const { optimisticPosts: optimisticPostsList, addPost } =
-    useOptimisticPosts(posts);
-  const { optimisticPosts, handleToggleLike } =
-    useOptimisticLikes(optimisticPostsList);
+  const { optimisticPosts, handleToggleLike } = useOptimisticLikes(posts);
+
+  const loadPosts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const newPosts = await getPosts({
+        query: searchParams.query,
+        filter: searchParams.filter || "all",
+        userId: currentUser.id,
+      });
+      setPosts(newPosts);
+      setHasMore(newPosts.length === 10);
+    } catch (error) {
+      console.error("Error loading posts:", error);
+      toast.error("Failed to load posts");
+    } finally {
+      setLoading(false);
+    }
+  }, [searchParams.query, searchParams.filter, currentUser.id]);
 
   useEffect(() => {
-    const loadPosts = async () => {
-      setLoading(true);
-      try {
-        const newPosts = await getPosts({
-          query: searchParams.query,
-          filter: searchParams.filter || "all",
-        });
-        setPosts(newPosts);
-        setHasMore(newPosts.length === 10);
-      } catch (error) {
-        console.error("Error loading posts:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadPosts();
-  }, [searchParams.query, searchParams.filter]);
+  }, [loadPosts]);
 
   const loadMore = async () => {
     if (!hasMore || loadingMore) return;
@@ -58,6 +58,7 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
         query: searchParams.query,
         filter: searchParams.filter || "all",
         cursor: lastPost?.created_at,
+        userId: currentUser.id,
       });
 
       if (morePosts.length > 0) {
@@ -68,20 +69,44 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
       }
     } catch (error) {
       console.error("Error loading more posts:", error);
+      toast.error("Failed to load more posts");
     } finally {
       setLoadingMore(false);
     }
   };
 
-  const handleOptimisticAdd = (newPost: any) => {
-    addPost({
-      ...newPost,
-      profiles: {
-        id: currentUser.id,
-        username: currentUser.username,
-        created_at: new Date().toISOString(),
-      },
-    });
+  const handlePostCreated = (newPost: PostWithDetails) => {
+    setPosts((prev) => [newPost, ...prev]);
+    toast.success("Post created successfully!");
+  };
+
+  const handlePostUpdated = (updatedPost: PostWithDetails) => {
+    setPosts((prev) =>
+      prev.map((post) => (post.id === updatedPost.id ? updatedPost : post))
+    );
+    toast.success("Post updated successfully!");
+  };
+
+  const handlePostDeleted = (postId: string) => {
+    setPosts((prev) => prev.filter((post) => post.id !== postId));
+    toast.success("Post deleted successfully!");
+  };
+
+  const handleLikeToggled = async (postId: string, isLiked: boolean) => {
+    handleToggleLike(postId, isLiked);
+
+    setPosts((prev) =>
+      prev.map((post) => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            is_liked: !isLiked,
+            like_count: isLiked ? post.like_count - 1 : post.like_count + 1,
+          };
+        }
+        return post;
+      })
+    );
   };
 
   if (loading) {
@@ -90,10 +115,7 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
 
   return (
     <div>
-      <Composer
-        onOptimisticAdd={handleOptimisticAdd}
-        currentUser={currentUser}
-      />
+      <Composer currentUser={currentUser} onPostCreated={handlePostCreated} />
 
       <div className="space-y-4">
         {optimisticPosts.length === 0 ? (
@@ -110,7 +132,9 @@ export function FeedContent({ searchParams, currentUser }: FeedContentProps) {
               key={post.id}
               post={post}
               currentUserId={currentUser.id}
-              onToggleLike={handleToggleLike}
+              onToggleLike={handleLikeToggled}
+              onPostUpdated={handlePostUpdated}
+              onPostDeleted={handlePostDeleted}
             />
           ))
         )}

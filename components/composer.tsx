@@ -3,17 +3,15 @@
 import { useState, useRef } from "react";
 import { createPost } from "@/lib/actions";
 import { Send } from "lucide-react";
+import { toast } from "react-toastify";
+import { PostWithDetails } from "@/types/post";
 
 interface ComposerProps {
-  onOptimisticAdd?: (post: {
-    content: string;
-    author_id: string;
-    profiles: { username: string };
-  }) => void;
-  currentUser?: { id: string; username: string };
+  currentUser: { id: string; username: string };
+  onPostCreated?: (post: PostWithDetails) => void;
 }
 
-export function Composer({ onOptimisticAdd, currentUser }: ComposerProps) {
+export function Composer({ currentUser, onPostCreated }: ComposerProps) {
   const [content, setContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -22,46 +20,40 @@ export function Composer({ onOptimisticAdd, currentUser }: ComposerProps) {
     if (!content.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
+    const contentToSubmit = content.trim();
 
     try {
-      if (onOptimisticAdd && currentUser) {
-        onOptimisticAdd({
-          content: content.trim(),
-          author_id: currentUser.id,
-          profiles: { username: currentUser.username },
-        });
-      }
-
-      const contentToSubmit = content.trim();
       setContent("");
       formRef.current?.reset();
 
       const result = await createPost(formData);
 
-      console.log("Create post result:", result);
+      if (result?.success && result.data) {
+        const fullPost: PostWithDetails = {
+          ...result.data,
+          profiles: {
+            id: currentUser.id,
+            username: currentUser.username,
+            created_at: new Date().toISOString(),
+          },
+          like_count: 0,
+          is_liked: false,
+        };
 
-      if (result && !result.success) {
-        /* If creation failed, restore the content and show error */
+        if (onPostCreated) {
+          onPostCreated(fullPost);
+        }
+      } else if (result && !result.success) {
         setContent(contentToSubmit);
-        const errorMessage = result.error || "Unknown error occurred";
-        console.error("Failed to create post:", errorMessage);
-        alert(`Failed to create post: ${errorMessage}`);
-      } else if (!result) {
-        /* If result is undefined, there was an error */
-        setContent(contentToSubmit);
-        console.error("Create post returned undefined");
-        alert("Failed to create post: Server error");
+        toast.error(result.error || "Failed to create post");
       } else {
-        console.log("Post created successfully:", result.data);
+        setContent(contentToSubmit);
+        toast.error("Failed to create post: Server error");
       }
     } catch (error) {
       console.error("Error creating post:", error);
-      alert("Failed to create post. Please try again.");
-      /* Restore content on error */
-      const originalContent = formData.get("content") as string;
-      if (originalContent) {
-        setContent(originalContent);
-      }
+      toast.error("Failed to create post. Please try again.");
+      setContent(contentToSubmit);
     } finally {
       setIsSubmitting(false);
     }

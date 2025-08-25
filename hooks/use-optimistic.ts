@@ -34,10 +34,10 @@ export function useOptimisticLikes(posts: PostWithDetails[]) {
         const result = await toggleLike(postId, isLiked);
         if (result && !result.success) {
           console.error("Error toggling like:", result.error);
+          /* The optimistic update will be reverted automatically */
         }
       } catch (error) {
         console.error("Error toggling like:", error);
-        /* The UI will revert automatically since we're using server actions with revalidatePath */
       }
     });
   };
@@ -45,40 +45,6 @@ export function useOptimisticLikes(posts: PostWithDetails[]) {
   return {
     optimisticPosts,
     handleToggleLike,
-    isPending,
-  };
-}
-
-export function useOptimisticPosts(initialPosts: PostWithDetails[]) {
-  const [optimisticPosts, addOptimisticPost] = useOptimistic(
-    initialPosts,
-    (state: PostWithDetails[], newPost: Partial<PostWithDetails>) => {
-      const optimisticPost: PostWithDetails = {
-        id: "temp-" + Date.now(),
-        author_id: newPost.author_id || "",
-        content: newPost.content || "",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        profiles: newPost.profiles || { id: "", username: "", created_at: "" },
-        like_count: 0,
-        is_liked: false,
-      };
-
-      return [optimisticPost, ...state];
-    }
-  );
-
-  const [isPending, startTransition] = useTransition();
-
-  const addPost = (newPost: Partial<PostWithDetails>) => {
-    startTransition(() => {
-      addOptimisticPost(newPost);
-    });
-  };
-
-  return {
-    optimisticPosts,
-    addPost,
     isPending,
   };
 }

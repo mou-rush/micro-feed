@@ -5,14 +5,23 @@ import { PostWithDetails } from "@/types/post";
 import { Heart, MessageSquare, Edit, Trash2, Save, X } from "lucide-react";
 import { deletePost, updatePost } from "@/lib/actions";
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "react-toastify";
 
 interface PostCardProps {
   post: PostWithDetails;
   currentUserId?: string;
   onToggleLike: (postId: string, isLiked: boolean) => void;
+  onPostUpdated?: (post: PostWithDetails) => void;
+  onPostDeleted?: (postId: string) => void;
 }
 
-export function PostCard({ post, currentUserId, onToggleLike }: PostCardProps) {
+export function PostCard({
+  post,
+  currentUserId,
+  onToggleLike,
+  onPostUpdated,
+  onPostDeleted,
+}: PostCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -28,12 +37,16 @@ export function PostCard({ post, currentUserId, onToggleLike }: PostCardProps) {
     setIsDeleting(true);
     try {
       const result = await deletePost(post.id);
-      if (result && !result.success) {
-        alert(`Failed to delete post: ${result.error}`);
+      if (result && result.success) {
+        if (onPostDeleted) {
+          onPostDeleted(post.id);
+        }
+      } else {
+        toast.error(result?.error || "Failed to delete post");
       }
     } catch (error) {
       console.error("Error deleting post:", error);
-      alert("Failed to delete post");
+      toast.error("Failed to delete post");
     } finally {
       setIsDeleting(false);
     }
@@ -48,14 +61,24 @@ export function PostCard({ post, currentUserId, onToggleLike }: PostCardProps) {
     setIsUpdating(true);
     try {
       const result = await updatePost(post.id, formData);
-      if (result?.success) {
+      if (result?.success && result.data) {
         setIsEditing(false);
+        if (onPostUpdated) {
+          const updatedPost: PostWithDetails = {
+            ...post,
+            ...result.data,
+            profiles: post.profiles,
+            like_count: post.like_count,
+            is_liked: post.is_liked,
+          };
+          onPostUpdated(updatedPost);
+        }
       } else {
-        alert(`Failed to update post: ${result?.error || "Unknown error"}`);
+        toast.error(result?.error || "Failed to update post");
       }
     } catch (error) {
       console.error("Error updating post:", error);
-      alert("Failed to update post");
+      toast.error("Failed to update post");
     } finally {
       setIsUpdating(false);
     }
@@ -64,6 +87,15 @@ export function PostCard({ post, currentUserId, onToggleLike }: PostCardProps) {
   const handleCancelEdit = () => {
     setEditContent(post.content);
     setIsEditing(false);
+  };
+
+  const handleLikeClick = () => {
+    try {
+      onToggleLike(post.id, post.is_liked);
+      toast.success(post.is_liked ? "Post unliked" : "Post liked!");
+    } catch (error) {
+      toast.error("Failed to update like");
+    }
   };
 
   return (
@@ -155,7 +187,7 @@ export function PostCard({ post, currentUserId, onToggleLike }: PostCardProps) {
         {!isEditing && (
           <div className="flex items-center space-x-4 mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
             <button
-              onClick={() => onToggleLike(post.id, post.is_liked)}
+              onClick={handleLikeClick}
               className={`flex items-center space-x-1 transition-colors ${
                 post.is_liked
                   ? "text-red-600"

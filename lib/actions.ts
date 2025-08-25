@@ -3,28 +3,19 @@
 import { createServerSupabaseClient } from "./supabase-server";
 import { requireAuth } from "./auth";
 import { createPostSchema, updatePostSchema } from "./validators";
-import { revalidatePath } from "next/cache";
 import { PostWithDetails } from "@/types/post";
 
 export async function createPost(formData: FormData) {
   try {
-    console.log("createPost: Starting...");
-
     const user = await requireAuth();
-    console.log("createPost: User authenticated:", user.id);
-
     const supabase = await createServerSupabaseClient();
     const content = formData.get("content") as string;
 
-    console.log("createPost: Content:", content);
-
-    if (!content || !content.trim()) {
+    if (!content?.trim()) {
       return { success: false, error: "Content is required" };
     }
 
-    /* Validate input */
     const validatedData = createPostSchema.parse({ content: content.trim() });
-    console.log("createPost: Data validated:", validatedData);
 
     const { data, error } = await supabase
       .from("posts")
@@ -42,8 +33,6 @@ export async function createPost(formData: FormData) {
       return { success: false, error: error.message };
     }
 
-    console.log("createPost: Success:", data);
-    revalidatePath("/");
     return { success: true, data };
   } catch (error) {
     console.error("createPost: Caught error:", error);
@@ -54,22 +43,18 @@ export async function createPost(formData: FormData) {
   }
 }
 
-/* Get posts with pagination and search */
 export async function getPosts(
   params: {
     query?: string;
     cursor?: string;
     filter?: "all" | "mine";
+    userId?: string;
   } = {}
 ) {
   try {
-    const { query = "", cursor, filter = "all" } = params;
-
-    console.log("getPosts: Starting with params:", { query, cursor, filter });
+    const { query = "", cursor, filter = "all", userId } = params;
 
     const user = await requireAuth();
-    console.log("getPosts: User authenticated:", user.id);
-
     const supabase = await createServerSupabaseClient();
 
     let queryBuilder = supabase
@@ -77,20 +62,18 @@ export async function getPosts(
       .select("id, author_id, content, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(10);
-
-    if (filter === "mine") {
-      queryBuilder = queryBuilder.eq("author_id", user.id);
+    if (filter === "mine" && userId) {
+      queryBuilder = queryBuilder.eq("author_id", userId);
     }
 
-    if (query && query !== "undefined") {
-      queryBuilder = queryBuilder.ilike("content", `%${query}%`);
+    if (query && query.trim() !== "") {
+      queryBuilder = queryBuilder.ilike("content", `%${query.trim()}%`);
     }
 
     if (cursor) {
       queryBuilder = queryBuilder.lt("created_at", cursor);
     }
 
-    console.log("getPosts: Executing posts query...");
     const { data: posts, error: postsError } = await queryBuilder;
 
     if (postsError) {
@@ -99,18 +82,14 @@ export async function getPosts(
     }
 
     if (!posts || posts.length === 0) {
-      console.log("getPosts: No posts found");
       return [];
     }
 
-    console.log("getPosts: Found posts:", posts.length);
-
     const authorIds = [...new Set(posts.map((post) => post.author_id))];
-    console.log("getPosts: Fetching profiles for authors:", authorIds);
 
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, username")
+      .select("id, username, created_at")
       .in("id", authorIds);
 
     if (profilesError) {
@@ -118,10 +97,7 @@ export async function getPosts(
       throw new Error(profilesError.message);
     }
 
-    console.log("getPosts: Found profiles:", profiles?.length || 0);
-
     const postIds = posts.map((post) => post.id);
-    console.log("getPosts: Fetching likes for posts:", postIds);
 
     const { data: likes, error: likesError } = await supabase
       .from("likes")
@@ -131,8 +107,6 @@ export async function getPosts(
     if (likesError) {
       console.warn("getPosts: Likes query error (non-fatal):", likesError);
     }
-
-    console.log("getPosts: Found likes:", likes?.length || 0);
 
     const profilesMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
@@ -152,11 +126,6 @@ export async function getPosts(
       };
     });
 
-    console.log(
-      "getPosts: Final result:",
-      postsWithDetails.length,
-      "posts with details"
-    );
     return postsWithDetails;
   } catch (error) {
     console.error("getPosts: Error:", error);
@@ -164,14 +133,13 @@ export async function getPosts(
   }
 }
 
-/* Update a post (only by the author) */
 export async function updatePost(postId: string, formData: FormData) {
   try {
     const user = await requireAuth();
     const supabase = await createServerSupabaseClient();
     const content = formData.get("content") as string;
 
-    if (!content || !content.trim()) {
+    if (!content?.trim()) {
       return { success: false, error: "Content is required" };
     }
 
@@ -192,7 +160,6 @@ export async function updatePost(postId: string, formData: FormData) {
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/");
     return { success: true, data };
   } catch (error) {
     console.error("updatePost: Error:", error);
@@ -203,7 +170,6 @@ export async function updatePost(postId: string, formData: FormData) {
   }
 }
 
-/* Delete a post (only by the author) */
 export async function deletePost(postId: string) {
   try {
     const user = await requireAuth();
@@ -219,7 +185,6 @@ export async function deletePost(postId: string) {
       return { success: false, error: error.message };
     }
 
-    revalidatePath("/");
     return { success: true };
   } catch (error) {
     console.error("deletePost: Error:", error);
@@ -255,7 +220,6 @@ export async function toggleLike(postId: string, isLiked: boolean) {
       }
     }
 
-    revalidatePath("/");
     return { success: true };
   } catch (error) {
     console.error("toggleLike: Error:", error);
